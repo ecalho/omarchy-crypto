@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "id": "thales.crypto",
+  "name": "Crypto",
+  "version": "1.0.0",
+  "author": "Thales Augusto",
+  "license": "MIT",
+  "description": "Bitcoin and favorite crypto prices in the Omarchy bar, with coin logos, and a popup showing 24h change, 7-day sparkline, and market stats.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Crypto",
+    "description": "Price pill for one favorite coin, plus a popup listing every favorite with 24h change and a 7-day sparkline. Prices from CoinGecko, logos from Dashboard Icons.",
+    "category": "Info",
+    "defaultSection": "right",
+    "allowMultiple": false,
+    "defaults": {
+      "coins": "bitcoin",
+      "currency": "usd",
+      "primary": "",
+      "refreshIntervalSec": 120,
+      "rotateSeconds": 10,
+      "showIcon": true,
+      "showSymbol": true,
+      "showChange": true,
+      "compactPrice": false,
+      "colorizeChange": true
+    },
+    "schema": [
+      {
+        "key": "coins",
+        "type": "string",
+        "label": "Favorite coins",
+        "description": "CoinGecko coin ids, comma-separated, in display order. Find an id in the URL of a coin page on coingecko.com (e.g. bitcoin, ethereum, solana, dogecoin). Empty means bitcoin.",
+        "defaultValue": "bitcoin"
+      },
+      {
+        "key": "currency",
+        "type": "enum",
+        "label": "Currency",
+        "options": ["usd", "brl", "eur", "gbp", "jpy", "cad", "aud", "chf", "cny", "inr", "sats", "btc", "eth"],
+        "defaultValue": "usd"
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "description": "CoinGecko's free API allows roughly 30 calls per minute across the whole machine. Keep this at 60 or more.",
+        "min": 30,
+        "max": 3600,
+        "step": 30,
+        "defaultValue": 120
+      },
+      {
+        "key": "rotateSeconds",
+        "type": "integer",
+        "label": "Rotate every (seconds)",
+        "description": "Walk the bar through every favorite on a timer. 0 keeps the pinned coin in place. Rotation holds while the popup is open or the pointer is on the pill.",
+        "min": 0,
+        "max": 3600,
+        "step": 1,
+        "defaultValue": 10
+      },
+      {
+        "key": "showIcon",
+        "type": "boolean",
+        "label": "Show coin icon",
+        "description": "Coin logo before the price.",
+        "defaultValue": true
+      },
+      {
+        "key": "showSymbol",
+        "type": "boolean",
+        "label": "Show ticker symbol",
+        "description": "Show BTC, ETH, ... before the price.",
+        "defaultValue": true
+      },
+      {
+        "key": "showChange",
+        "type": "boolean",
+        "label": "Show 24h change",
+        "description": "Append the 24 hour percentage change to the bar label.",
+        "defaultValue": true
+      },
+      {
+        "key": "compactPrice",
+        "type": "boolean",
+        "label": "Compact price",
+        "description": "Abbreviate large prices, e.g. $67.4k instead of $67,432.",
+        "defaultValue": false
+      },
+      {
+        "key": "colorizeChange",
+        "type": "boolean",
+        "label": "Colorize the bar label",
+        "description": "Tint the label with the theme accent when up and the urgent color when down.",
+        "defaultValue": true
+      }
+    ]
+  }
+}
