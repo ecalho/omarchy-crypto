@@ -38,7 +38,7 @@ Omarchy 4 (the `omarchy-shell` Quickshell host) and `curl`.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<you>/omarchy-bitcoin.git --enable --yes
+omarchy plugin add https://github.com/ThalesAugusto0/omarchy-bitcoin.git --enable --yes
 ```
 
 Or by hand, from a clone of this repo:

@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Thales Augusto",
   "license": "MIT",
-  "description": "Bitcoin and favorite crypto prices in the Omarchy bar, with coin logos, and a popup showing 24h change, 7-day sparkline, and market stats.",
+  "description": "Bitcoin and favorite crypto prices in the Omarchy bar — coin logos, 24h change, 7-day sparkline, market stats.",
   "kinds": [
     "bar-widget"
   ],
