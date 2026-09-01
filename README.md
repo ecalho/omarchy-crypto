@@ -35,6 +35,18 @@ POPUP   ₿ Bitcoin                      BTC / USD · updated 22:36:25   -1.07%
 
 Omarchy 4 (the `omarchy-shell` Quickshell host) and `curl`.
 
+External dependencies, all optional to install and all reached over HTTPS at
+runtime:
+
+| Dependency | What it is for | Account needed |
+|------------|----------------|----------------|
+| [CoinGecko public API](https://www.coingecko.com/en/api) | Prices, 24h change, market stats, 7-day sparkline | No, no API key |
+| [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) via jsDelivr | Logos for coins that do not ship with the plugin | No |
+| JetBrainsMono Nerd Font | Text fallback glyph when no logo loads | No, ships with Omarchy |
+
+No package is installed, no service is started, and nothing outside
+`~/.config/omarchy` is written.
+
 ## Install
 
 ```bash
@@ -50,6 +62,28 @@ omarchy plugin enable thales.crypto
 ```
 
 Move it around the bar with `omarchy bar move thales.crypto left|center|right`.
+
+## Remove
+
+```bash
+omarchy plugin remove thales.crypto --yes
+```
+
+That disables the widget, deletes or unlinks the plugin folder, and rescans.
+A hand-made symlink is unlinked rather than deleted, so the clone stays put.
+
+The widget's settings live in its entry in `~/.config/omarchy/shell.json`, under
+`bar.layout.<section>`. Removing the plugin unloads the widget but leaves that
+entry in place. Drop it from Setup > Plugins, or by hand:
+
+```bash
+jq 'del(.bar.layout[][] | select(.id == "thales.crypto"))' \
+  ~/.config/omarchy/shell.json > /tmp/shell.json &&
+  mv /tmp/shell.json ~/.config/omarchy/shell.json
+```
+
+Nothing else is left behind — the plugin writes no files of its own, installs no
+packages, and touches nothing outside `~/.config/omarchy`.
 
 ## Interactions
 
@@ -175,4 +209,4 @@ omarchy-shell thales.crypto price      # print the current bar label
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
