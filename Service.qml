@@ -49,7 +49,8 @@ Item {
   function startFetch() {
     loading = true
     requestIds = ids
-    fetchProc.command = ["curl", "-fsS", "--max-time", "12", url]
+    fetchProc.command = ["curl", "-fsS", "--max-time", "12",
+      "--max-filesize", String(Model.MAX_RESPONSE_BYTES), url]
     fetchProc.running = true
   }
 
@@ -57,6 +58,10 @@ Item {
     var text = String(raw || "").replace(/^\s+|\s+$/g, "")
     if (text === "") {
       failed("Empty response from CoinGecko")
+      return
+    }
+    if (text.length > Model.MAX_RESPONSE_BYTES) {
+      failed("CoinGecko response was too large")
       return
     }
     try {
@@ -111,9 +116,9 @@ Item {
       var answeredOldQuestion = root.requestIds.join(",") !== root.ids.join(",")
       if (!answeredOldQuestion) {
         if (exitCode === 0) root.applyResponse(outCollector.text)
-        else root.failed(exitCode === 22
-          ? "CoinGecko refused the request (rate limited?)"
-          : "Could not reach CoinGecko")
+        else if (exitCode === 22) root.failed("CoinGecko refused the request (rate limited?)")
+        else if (exitCode === 63) root.failed("CoinGecko response was too large")
+        else root.failed("Could not reach CoinGecko")
       }
 
       if (root.refreshQueued || answeredOldQuestion) {

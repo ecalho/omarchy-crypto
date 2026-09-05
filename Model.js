@@ -2,6 +2,29 @@ var API_BASE = "https://api.coingecko.com/api/v3/coins/markets"
 var DEFAULT_COIN = "bitcoin"
 var COIN_PAGE = "https://www.coingecko.com/en/coins/"
 
+// Bounds on API-controlled data, so a compromised endpoint cannot grow memory
+// without limit: the byte cap is enforced by curl --max-filesize and re-checked
+// before JSON.parse, the item caps while normalizing the parsed payload.
+var MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+var MAX_COINS = 250
+var MAX_SPARKLINE_POINTS = 512
+var MAX_IMAGE_URL_LENGTH = 2048
+
+// Only load remote coin images over HTTPS from CoinGecko's own image hosts;
+// anything else in the API payload is dropped and the glyph fallback shows.
+var IMAGE_HOSTS = {
+  "coin-images.coingecko.com": true,
+  "assets.coingecko.com": true
+}
+
+function safeImageUrl(raw) {
+  var url = String(raw || "")
+  if (url === "" || url.length > MAX_IMAGE_URL_LENGTH) return ""
+  var match = url.match(/^https:\/\/([a-z0-9.-]+)(?::443)?[\/?#]/i)
+  if (!match || IMAGE_HOSTS[match[1].toLowerCase()] !== true) return ""
+  return url
+}
+
 var BUNDLED_ICONS = {
   "bitcoin": true,
   "ethereum": true,
@@ -71,7 +94,8 @@ function parseMarkets(raw, ids) {
   if (!Array.isArray(parsed)) throw new Error("unexpected response shape")
 
   var byId = {}
-  for (var i = 0; i < parsed.length; ++i) {
+  var count = Math.min(parsed.length, MAX_COINS)
+  for (var i = 0; i < count; ++i) {
     var entry = parsed[i]
     if (!entry || typeof entry !== "object" || !entry.id) continue
     byId[String(entry.id).toLowerCase()] = normalizeCoin(entry)
@@ -87,7 +111,7 @@ function parseMarkets(raw, ids) {
 
 function normalizeCoin(entry) {
   var spark = entry.sparkline_in_7d && Array.isArray(entry.sparkline_in_7d.price)
-    ? entry.sparkline_in_7d.price
+    ? entry.sparkline_in_7d.price.slice(0, MAX_SPARKLINE_POINTS)
     : []
   return {
     id: String(entry.id).toLowerCase(),
@@ -100,7 +124,7 @@ function normalizeCoin(entry) {
     marketCap: toNumber(entry.market_cap),
     volume: toNumber(entry.total_volume),
     rank: toNumber(entry.market_cap_rank),
-    image: String(entry.image || ""),
+    image: safeImageUrl(entry.image),
     sparkline: spark
   }
 }
