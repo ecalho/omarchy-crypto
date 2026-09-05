@@ -9,12 +9,18 @@ var MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 var MAX_COINS = 250
 var MAX_SPARKLINE_POINTS = 512
 var MAX_IMAGE_URL_LENGTH = 2048
+var MAX_TEXT_LENGTH = 64
 
 // Only load remote coin images over HTTPS from CoinGecko's own image hosts;
 // anything else in the API payload is dropped and the glyph fallback shows.
 var IMAGE_HOSTS = {
   "coin-images.coingecko.com": true,
   "assets.coingecko.com": true
+}
+
+function clampText(value, fallback) {
+  var text = String(value === undefined || value === null || value === "" ? fallback : value)
+  return text.slice(0, MAX_TEXT_LENGTH)
 }
 
 function safeImageUrl(raw) {
@@ -98,7 +104,7 @@ function parseMarkets(raw, ids) {
   for (var i = 0; i < count; ++i) {
     var entry = parsed[i]
     if (!entry || typeof entry !== "object" || !entry.id) continue
-    byId[String(entry.id).toLowerCase()] = normalizeCoin(entry)
+    byId[clampText(entry.id, "").toLowerCase()] = normalizeCoin(entry)
   }
 
   var coins = []
@@ -114,9 +120,9 @@ function normalizeCoin(entry) {
     ? entry.sparkline_in_7d.price.slice(0, MAX_SPARKLINE_POINTS)
     : []
   return {
-    id: String(entry.id).toLowerCase(),
-    name: String(entry.name || entry.id),
-    symbol: String(entry.symbol || "").toUpperCase(),
+    id: clampText(entry.id, "").toLowerCase(),
+    name: clampText(entry.name, entry.id),
+    symbol: clampText(entry.symbol, "").toUpperCase(),
     price: toNumber(entry.current_price),
     change24h: toNumber(entry.price_change_percentage_24h),
     high24h: toNumber(entry.high_24h),

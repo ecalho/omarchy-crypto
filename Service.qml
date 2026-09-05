@@ -49,8 +49,8 @@ Item {
   function startFetch() {
     loading = true
     requestIds = ids
-    fetchProc.command = ["curl", "-fsS", "--max-time", "12",
-      "--max-filesize", String(Model.MAX_RESPONSE_BYTES), url]
+    fetchProc.command = ["curl", "-fsS", "--proto", "=https", "--tlsv1.2",
+      "--max-time", "12", "--max-filesize", String(Model.MAX_RESPONSE_BYTES), url]
     fetchProc.running = true
   }
 
