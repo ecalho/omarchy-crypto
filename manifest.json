@@ -15,7 +15,7 @@
   },
   "barWidget": {
     "displayName": "Crypto",
-    "description": "Price pill for one favorite coin, plus a popup listing every favorite with 24h change and a 7-day sparkline. Prices from CoinGecko, logos from Dashboard Icons.",
+    "description": "Price pill for one favorite coin, plus a popup listing every favorite with 24h change and a 7-day sparkline. Prices and logos from CoinGecko.",
     "category": "Info",
     "defaultSection": "right",
     "allowMultiple": false,

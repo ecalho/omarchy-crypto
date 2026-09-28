@@ -6,11 +6,13 @@ Item {
   id: root
 
   property var coin: null
+  // Validated local copy of the API image, from Service.iconFor(coin).
+  property string cachedFile: ""
   property real size: Style.font.icon
   property color fallbackColor: Color.foreground
   property string fontFamily: Style.font.family
 
-  readonly property var candidates: Model.iconCandidates(coin, Qt.resolvedUrl("icons/"))
+  readonly property var candidates: Model.iconCandidates(coin, Qt.resolvedUrl("icons/"), cachedFile)
   readonly property string candidatesKey: candidates.join("\n")
   property int candidateIndex: 0
 
@@ -34,6 +36,8 @@ Item {
   }
 
   Text {
+
+    textFormat: Text.PlainText
     anchors.centerIn: parent
     visible: mark.status !== Image.Ready
     text: Model.glyphFor(root.coin)

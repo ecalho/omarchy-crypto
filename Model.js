@@ -11,7 +11,7 @@ var MAX_SPARKLINE_POINTS = 512
 var MAX_IMAGE_URL_LENGTH = 2048
 var MAX_TEXT_LENGTH = 64
 
-// Only load remote coin images over HTTPS from CoinGecko's own image hosts;
+// Only download remote coin images over HTTPS from CoinGecko's own image hosts;
 // anything else in the API payload is dropped and the glyph fallback shows.
 var IMAGE_HOSTS = {
   "coin-images.coingecko.com": true,
@@ -37,15 +37,47 @@ var BUNDLED_ICONS = {
   "solana": true
 }
 
-var ICON_CDN = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/"
+// Remote coin images never reach QML as network URLs. Service.qml downloads
+// them with IMAGE_FETCH_SCRIPT into the shell cache, and only the resulting
+// local file is handed to Image. The script refuses redirects and non-200
+// answers, caps the body at MAX_IMAGE_BYTES, and keeps the file only when its
+// magic bytes are PNG, JPEG, GIF, or WebP, so SVG or other formats never load.
+var MAX_IMAGE_BYTES = 256 * 1024
+var IMAGE_FETCH_SCRIPT = [
+  'set -eu',
+  'url=$1 dest=$2 max=$3',
+  '[ -s "$dest" ] && exit 0',
+  'mkdir -p "${dest%/*}"',
+  'tmp=$(mktemp "$dest.XXXXXX")',
+  'trap \'rm -f "$tmp"\' EXIT',
+  'code=$(curl -fsS --proto =https --proto-redir =https --tlsv1.2 --max-redirs 0 --max-time 10 --max-filesize "$max" -o "$tmp" -w "%{http_code}" "$url")',
+  '[ "$code" = 200 ] || exit 64',
+  'size=$(wc -c < "$tmp")',
+  '[ "$size" -gt 0 ] && [ "$size" -le "$max" ] || exit 63',
+  'magic=$(head -c 12 "$tmp" | od -An -tx1 | tr -d " \\n")',
+  'case "$magic" in 89504e470d0a1a0a*|ffd8ff*|47494638*|52494646????????57454250) ;; *) exit 65 ;; esac',
+  'mv -f "$tmp" "$dest"',
+  'trap - EXIT'
+].join("\n")
 
-function iconCandidates(coin, bundledBase) {
+function hasBundledIcon(id) {
+  return BUNDLED_ICONS[id] === true
+}
+
+function imageCacheFile(dir, url) {
+  return String(dir) + "/" + Qt.md5(String(url)) + ".img"
+}
+
+function isLocalUrl(url) {
+  return /^(file|qrc):/i.test(String(url))
+}
+
+function iconCandidates(coin, bundledBase, cachedFile) {
   if (!coin) return []
   var list = []
-  if (BUNDLED_ICONS[coin.id]) list.push(String(bundledBase) + coin.id + ".svg")
-  list.push(ICON_CDN + encodeURIComponent(coin.id) + ".svg")
-  if (coin.image) list.push(String(coin.image))
-  return list
+  if (hasBundledIcon(coin.id)) list.push(String(bundledBase) + coin.id + ".svg")
+  if (cachedFile) list.push(String(cachedFile))
+  return list.filter(isLocalUrl)
 }
 
 var GLYPHS = {

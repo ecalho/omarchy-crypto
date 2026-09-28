@@ -275,12 +275,15 @@ Panel {
         visible: root.showIcon
         anchors.verticalCenter: parent.verticalCenter
         coin: root.displayCoin
+        cachedFile: service.iconFor(root.displayCoin)
         size: root.pillIconSize
         fallbackColor: button.labelColor
         fontFamily: button.fontFamily
       }
 
       Text {
+
+        textFormat: Text.PlainText
         anchors.verticalCenter: parent.verticalCenter
         text: root.barText
         color: button.labelColor
@@ -309,6 +312,7 @@ Panel {
         CoinIcon {
           anchors.centerIn: parent
           coin: root.displayCoin
+          cachedFile: service.iconFor(root.displayCoin)
           size: root.pillIconSize
           fallbackColor: button.labelColor
           fontFamily: button.fontFamily
@@ -387,6 +391,7 @@ Panel {
             iconComponent: Component {
               CoinIcon {
                 coin: root.selectedCoin
+                cachedFile: service.iconFor(root.selectedCoin)
                 size: Style.font.display
                 fallbackColor: root.changeColor(root.selectedCoin ? root.selectedCoin.change24h : NaN, root.foreground)
                 fontFamily: root.fontFamily
@@ -399,6 +404,8 @@ Panel {
             spacing: Style.space(8)
 
             Text {
+
+              textFormat: Text.PlainText
               text: root.selectedCoin
                 ? Model.formatPrice(root.selectedCoin.price, service.currency, false)
                 : "—"
@@ -409,6 +416,8 @@ Panel {
             }
 
             Text {
+
+              textFormat: Text.PlainText
               visible: root.selectedCoin !== null
               text: Model.changeGlyph(root.selectedCoin ? root.selectedCoin.change24h : NaN) + " 24h"
               color: root.changeColor(root.selectedCoin ? root.selectedCoin.change24h : NaN, root.dim)
@@ -483,6 +492,8 @@ Panel {
           }
 
           Text {
+
+            textFormat: Text.PlainText
             visible: text !== ""
             width: parent.width
             text: {
@@ -498,6 +509,8 @@ Panel {
           }
 
           Text {
+
+            textFormat: Text.PlainText
             width: parent.width
             text: "↑↓ select · enter pin · r refresh · o coingecko"
             color: root.dim
@@ -593,6 +606,7 @@ Panel {
 
       CoinIcon {
         coin: coinRow.coin
+        cachedFile: service.iconFor(coinRow.coin)
         size: Style.font.icon
         fallbackColor: coinRow.isPrimary ? root.foreground : root.dim
         fontFamily: root.fontFamily
@@ -606,6 +620,8 @@ Panel {
         spacing: Style.space(1)
 
         Text {
+
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: coinRow.coin ? coinRow.coin.name : ""
           color: root.foreground
@@ -615,6 +631,8 @@ Panel {
         }
 
         Text {
+
+          textFormat: Text.PlainText
           Layout.fillWidth: true
           text: coinRow.coin ? coinRow.coin.symbol : ""
           color: root.dim
@@ -629,6 +647,8 @@ Panel {
         Layout.alignment: Qt.AlignVCenter
 
         Text {
+
+          textFormat: Text.PlainText
           Layout.alignment: Qt.AlignRight
           text: coinRow.coin ? Model.formatPrice(coinRow.coin.price, service.currency, root.compactPrice) : "—"
           color: root.foreground
@@ -637,6 +657,8 @@ Panel {
         }
 
         Text {
+
+          textFormat: Text.PlainText
           Layout.alignment: Qt.AlignRight
           text: coinRow.coin ? Model.formatChange(coinRow.coin.change24h) : ""
           color: root.changeColor(coinRow.coin ? coinRow.coin.change24h : NaN, root.dim)
@@ -656,6 +678,8 @@ Panel {
     spacing: Style.space(8)
 
     Text {
+
+      textFormat: Text.PlainText
       id: pairLabel
       text: pair.label
       color: root.foreground
@@ -670,6 +694,8 @@ Panel {
     }
 
     Text {
+
+      textFormat: Text.PlainText
       id: pairValue
       text: pair.value
       color: root.foreground

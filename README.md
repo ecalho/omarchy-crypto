@@ -41,11 +41,11 @@ runtime:
 | Dependency | What it is for | Account needed |
 |------------|----------------|----------------|
 | [CoinGecko public API](https://www.coingecko.com/en/api) | Prices, 24h change, market stats, 7-day sparkline | No, no API key |
-| [Dashboard Icons](https://github.com/homarr-labs/dashboard-icons) via jsDelivr | Logos for coins that do not ship with the plugin | No |
 | JetBrainsMono Nerd Font | Text fallback glyph when no logo loads | No, ships with Omarchy |
 
-No package is installed, no service is started, and nothing outside
-`~/.config/omarchy` is written.
+No package is installed and no service is started. Besides
+`~/.config/omarchy`, the only thing written is the logo cache under the
+Quickshell cache directory (`~/.cache/quickshell/by-shell/<hash>/thales.crypto/icons`).
 
 ## Install
 
@@ -130,17 +130,24 @@ A coin resolves to the first mark that loads:
 
 1. a **bundled SVG** in `icons/<id>.svg` — Bitcoin, Ethereum, and Solana ship
    with the plugin, so those three draw with no network at all
-2. **[Dashboard Icons](https://github.com/homarr-labs/dashboard-icons)**, at
-   `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/<id>.svg` —
-   this is where Monero, Ethereum, Bitcoin and friends come from upstream
-3. the **logo CoinGecko itself returned** for the coin, which exists for every
-   coin the API knows
-4. a **Nerd Font glyph**, drawn as text, if all of the above fail
+2. the **logo CoinGecko returned** for the coin, which exists for every coin
+   the API knows
+3. a **Nerd Font glyph**, drawn as text, if neither loads
 
-So a coin you add gets a real mark without this plugin shipping one, and a
-machine with no network still draws the coins it ships. Dropping an SVG at
-`icons/<id>.svg` and adding the id to `BUNDLED_ICONS` in `Model.js` makes any
-coin offline-capable.
+The CoinGecko logo is never loaded by QML straight from the network. It is
+downloaded once with `curl` into the Quickshell cache, and only that local file
+is shown. The download:
+
+- accepts only `https://` URLs on `coin-images.coingecko.com` or
+  `assets.coingecko.com`
+- refuses redirects and any answer other than HTTP 200
+- stops at 256 KiB, whether or not the server sends a length
+- keeps the file only if its first bytes are PNG, JPEG, GIF, or WebP, so SVG
+  or any other format never reaches the image decoder
+
+Rejected logos are logged to the shell log and the coin falls back to the
+glyph. Dropping an SVG at `icons/<id>.svg` and adding the id to
+`BUNDLED_ICONS` in `Model.js` makes any coin offline-capable.
 
 Example:
 
