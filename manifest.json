@@ -25,8 +25,10 @@
       "primary": "",
       "refreshIntervalSec": 120,
       "rotateSeconds": 10,
+      "chartRange": "1w",
       "showIcon": true,
       "showSymbol": true,
+      "showPrice": true,
       "showChange": true,
       "compactPrice": false,
       "colorizeChange": true
@@ -81,10 +83,17 @@
         "defaultValue": true
       },
       {
+        "key": "showPrice",
+        "type": "boolean",
+        "label": "Show price",
+        "description": "Show the price in the bar pill. Turn it off for a label with only the ticker symbol and the percentage.",
+        "defaultValue": true
+      },
+      {
         "key": "showChange",
         "type": "boolean",
-        "label": "Show 24h change",
-        "description": "Append the 24 hour percentage change to the bar label.",
+        "label": "Show change %",
+        "description": "Append the percentage change of the chart range selected in 'Chart range' (falls back to the 24h change until that chart is fetched).",
         "defaultValue": true
       },
       {
@@ -100,6 +109,14 @@
         "label": "Colorize the bar label",
         "description": "Tint the label with the theme accent when up and the urgent color when down.",
         "defaultValue": true
+      },
+      {
+        "key": "chartRange",
+        "type": "enum",
+        "label": "Chart range",
+        "description": "Default time range for the popup chart: 1h, 4h, 1d, 1w, 1m or all (full history). This percentage is also what the bar pill reports.",
+        "options": ["1h", "4h", "1d", "1w", "1m", "all"],
+        "defaultValue": "1w"
       }
     ]
   }

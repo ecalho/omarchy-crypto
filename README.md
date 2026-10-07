@@ -4,8 +4,9 @@ Bitcoin and favorite crypto prices in the [Omarchy](https://omarchy.org) bar.
 
 The bar shows one coin at a time — with its logo — and rotates through your
 favorites on a timer. A popup shows all of them at once with 24 hour change, a
-7-day sparkline, and market stats. Clicking a coin in the popup pins it to the
-bar, and the choice is written to `shell.json`, so it survives a restart.
+lightweight price chart (1h, 4h, 1 day, 1 week, 1 month, or all history, your
+choice), and market stats. Clicking a coin in the popup pins it to the bar, and
+the choice is written to `shell.json`, so it survives a restart.
 
 Out of the box it follows Bitcoin. Name any coins you want in the `coins`
 setting and they appear, logo and all.
@@ -96,11 +97,19 @@ packages, and touches nothing outside `~/.config/omarchy`.
 | Bar    | scroll       | previous / next favorite coin           |
 | Popup  | click a row  | pin that coin to the bar                |
 | Popup  | right click a row | open the coin on coingecko.com     |
+| Popup  | click the `x` before a favorite | remove it from favorites  |
+| Popup  | click a range pill (`1H 4H 1D 1W 1M ALL`) | switch the chart's time range |
+| Popup  | `/`          | focus the coin search field             |
 | Popup  | `↑` `↓`      | move the cursor                         |
 | Popup  | `enter`      | pin the selected coin to the bar        |
+| Popup  | `x`          | remove the selected favorite            |
 | Popup  | `r`          | refresh                                 |
 | Popup  | `o`          | open the selected coin on coingecko.com |
 | Popup  | `esc`        | close                                   |
+| Search | type         | search CoinGecko for a coin to add      |
+| Search | `↑` `↓`      | move through the results                |
+| Search | `enter`      | add the selected result to favorites    |
+| Search | click a row  | add that coin and pin it to the bar     |
 
 ## Settings
 
@@ -116,13 +125,85 @@ and are editable from Setup > Plugins.
 | `rotateSeconds`      | `10`                        | Seconds each coin holds the bar. `0` pins the bar to one coin |
 | `showIcon`           | `true`                      | Coin logo before the price |
 | `showSymbol`         | `true`                      | `BTC`, `ETH`, … before the price |
-| `showChange`         | `true`                      | Append the 24h percentage to the bar label |
+| `showPrice`          | `true`                      | The price itself in the pill. Off → symbol + percentage only |
+| `showChange`         | `true`                      | Append the selected chart range's percentage to the label |
 | `compactPrice`       | `false`                     | `$78.9k` instead of `$78,851` |
 | `colorizeChange`     | `true`                      | Tint the bar label: theme accent when up, urgent when down |
+| `chartRange`         | `1w`                        | Default chart range: `1h`, `4h`, `1d`, `1w`, `1m`, or `all`; its change % is what the bar pill reports |
 
 Coin ids are the ones in a CoinGecko URL — `coingecko.com/en/coins/**dogecoin**`
 is `dogecoin`. An id the API does not know is listed at the bottom of the popup
 rather than silently dropped.
+
+## Adding coins
+
+The popup has an "ADD A COIN" search field (press `/` from anywhere in the
+popup to focus it). Type part of a name — `sol`, `doge`, `fetcht` — and the
+top CoinGecko matches appear. Click one, or arrow down to it and press
+`enter`, and the coin joins your favorites, its icon is cached, and it is
+pinned to the bar. Everything is written to `shell.json`, so it sticks.
+
+Coins you already follow are filtered out of the results, so every row shown
+means "not tracked yet". Clearing the field costs no API call — nothing is
+fetched until at least two characters are typed.
+
+## Removing coins
+
+Every favorite row in the popup has a small `x` on its left. Click it and the
+coin leaves your favorites list immediately; the change is written to
+`shell.json`. Removing the coin currently pinned to the bar falls back to the
+first remaining favorite (or back to Bitcoin if it was the last one). From the
+keyboard, arrow to a favorite and press `x` to drop it.
+
+## Chart ranges
+
+Above the chart in the popup is a row of range pills — `1H 4H 1D 1W 1M ALL`.
+They redraw the chart for the coin currently highlighted, and the pill itself
+persists in `shell.json` via the `chartRange` setting.
+
+Ranges are drawn from CoinGecko's `market_chart` endpoint and cached per coin,
+so bouncing between ranges never re-fetches:
+
+| Range | Data |
+|-------|------|
+| `1H` / `4H` | the trailing hour / four hours of 5-minute points |
+| `1D` | the last day of 5-minute points |
+| `1W` | the 7-day sparkline that already comes with every price fetch — zero extra requests |
+| `1M` | 30 days of ~30-minute points |
+| `ALL` | full history when the free API allows it, otherwise one year |
+
+The numbered caption next to the price switches with the range (e.g. `▲ 1W
++2.4%`) and only ever reports the gain of the range that is selected — it never
+substitutes the 24h change. While a dedicated range is being fetched the
+caption shows a neutral `– 1M` and a small `…` appears beside the pills. A
+header above the pills always states which coin the chart is showing, which
+range, and its gain — `Bitcoin · 1M · +7.07%`.
+
+Everything above — hero price, header, chart and the market stats below — is
+**pinned to the selected coin**, not the hovered one. Moving the mouse over the
+favorites list or walking the cursor with the keyboard only moves the
+highlight; the display switches once you actually select a coin (click it, or
+press `enter` on it), which also pins it to the bar.
+
+The chart is sized generously and never goes blank mid-session: while a new
+range or coin loads, the previous drawing is dimmed and the coin's free 7-day
+sparkline steps in immediately, so there is always something to look at.
+
+Hover the chart for detail: a crosshair tracks the pointer and a badge shows
+the exact price, the timestamp, and the gain since the start of the range.
+It flips to the other side of the line near the edges so it never clips.
+
+## Bar label
+
+The pill composes four independent toggles (Setup → Plugins → Coin ticker):
+`showIcon` (logo), `showSymbol` (e.g. `KAS`), `showPrice` (e.g. `$0.0430`) and
+`showChange`. So `KAS $0.0430 +2.4%` is just the default; turn `showPrice` off
+for a quiet `KAS +2.4%`, or keep any combination you like.
+
+The percentage is the gain of whatever `chartRange` is selected — pick `1M` in
+the range pills and the bar follows with the 30-day change. It falls back to
+the 24h change only until that range's chart is fetched (the free 7-day
+sparkline covers the default `1W` range with zero extra requests).
 
 ## Coin logos
 
@@ -201,6 +282,10 @@ omarchy-shell thales.crypto refresh    # fetch now
 omarchy-shell thales.crypto next       # pin the next favorite to the bar
 omarchy-shell thales.crypto rotate     # advance the rotation without pinning
 omarchy-shell thales.crypto price      # print the current bar label
+omarchy-shell thales.crypto search "sol"      # query CoinGecko (results pop the UI)
+omarchy-shell thales.crypto add dogecoin      # add a coin to favorites and pin it
+omarchy-shell thales.crypto remove dogecoin   # drop a coin from favorites
+omarchy-shell thales.crypto chart "1m"        # switch chart range and print its change
 ```
 
 ## Files
@@ -209,7 +294,7 @@ omarchy-shell thales.crypto price      # print the current bar label
 |----------------|------------|
 | `manifest.json`| Plugin declaration and settings schema |
 | `Panel.qml`    | Bar pill and popup — the entry point |
-| `Service.qml`  | CoinGecko polling, retries, stale state |
+| `Service.qml`  | CoinGecko polling, coin search, and chart fetching — with retries and caching |
 | `CoinIcon.qml` | One coin's mark, walking the candidate list to a text fallback |
 | `Model.js`     | Parsing, formatting, and icon resolution — no QML |
 | `icons/`       | Bundled coin SVGs (Bitcoin, Ethereum, Solana) |

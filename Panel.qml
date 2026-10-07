@@ -15,6 +15,33 @@ Panel {
   property int coinIndex: 0
   property bool cursorActive: false
 
+  readonly property string chartRangeKey: String(setting("chartRange", "1w") || "1w")
+  readonly property string chartRangeLabel: Model.chartRangeLabel(root.chartRangeKey)
+  readonly property real activeChartPct: {
+    // Only ever report the percentage for the exact range that is selected,
+    // so the caption can't quietly show the 24h change under a "1M" label
+    // while the dedicated fetch runs. It is NaN (no number) until ready.
+    if (!root.displayCoin) return NaN
+    var chart = service.chartFor(root.displayCoin, root.chartRangeKey)
+    return chart && isFinite(chart.pct) ? chart.pct : NaN
+  }
+  readonly property bool chartBusy: service.chartActiveRequest !== null
+    && root.displayCoin !== null
+    && service.chartActiveRequest.key === Model.chartCacheKey(root.displayCoin.id, root.chartRangeKey)
+
+  // The chart header ("Bitcoin · 1M · +7.07%") follows the selected (pinned)
+  // coin and whichever range is active, so the popup always states what the
+  // chart beneath it is showing. Hovering the favorites list only moves the
+  // highlight; the display changes once a coin is actually selected.
+  readonly property string chartHeaderText: {
+    var name = root.displayCoin ? root.displayCoin.name : "Crypto"
+    var bits = [name]
+    if (root.chartRangeLabel !== "") bits.push(root.chartRangeLabel)
+    if (isFinite(root.activeChartPct)) bits.push(Model.formatChange(root.activeChartPct))
+    else if (root.chartBusy) bits.push("…")
+    return bits.join(" · ")
+  }
+
   readonly property bool vertical: bar ? bar.vertical : false
 
   readonly property var coins: service.coins
@@ -24,6 +51,18 @@ Panel {
     ? coins[Math.max(0, Math.min(coinIndex, coins.length - 1))]
     : null
 
+  property int searchIndex: 0
+
+  // Search hits that are not favorites yet, so every row means "add this one".
+  readonly property var searchResults: {
+    var out = []
+    for (var i = 0; i < service.searchResults.length; ++i) {
+      var result = service.searchResults[i]
+      if (service.ids.indexOf(result.id) === -1) out.push(result)
+    }
+    return out
+  }
+
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property color dim: Qt.darker(foreground, 1.55)
@@ -31,6 +70,7 @@ Panel {
 
   readonly property bool showIcon: setting("showIcon", true) === true
   readonly property bool showSymbol: setting("showSymbol", true) === true
+  readonly property bool showPrice: setting("showPrice", true) === true
   readonly property bool showChange: setting("showChange", true) === true
   readonly property bool compactPrice: setting("compactPrice", false) === true
   readonly property bool colorizeChange: setting("colorizeChange", true) === true
@@ -40,18 +80,33 @@ Panel {
     return Math.max(2, Math.min(3600, seconds))
   }
 
+  // The percentage the bar pill reports follows the selected chart range
+  // (e.g. the 1M gain) instead of the 24h change. Falls back to the 24h
+  // change only while that range's chart has not been fetched yet, and the
+  // free 7-day sparkline covers the default 1W range with no extra request.
+  readonly property real barChangePct: {
+    if (!root.displayCoin) return NaN
+    var record = service.chartFor(root.displayCoin, root.chartRangeKey)
+    if (record && isFinite(record.pct)) return record.pct
+    if (root.chartRangeKey === "1w" && Array.isArray(root.displayCoin.sparkline))
+      return Model.sparklineChange(root.displayCoin.sparkline)
+    return isFinite(root.displayCoin.change24h) ? root.displayCoin.change24h : NaN
+  }
+
   readonly property var labelOptions: ({
     currency: service.currency,
     showSymbol: root.showSymbol,
+    showPrice: root.showPrice,
     showChange: root.showChange,
-    compactPrice: root.compactPrice
+    compactPrice: root.compactPrice,
+    changePct: root.barChangePct
   })
 
   property real pillOpacity: 1.0
 
   readonly property string barText: Model.barLabel(displayCoin, labelOptions)
   readonly property var barLines: Model.verticalBarLines(displayCoin, labelOptions)
-  readonly property int displayDirection: displayCoin ? Model.changeDirection(displayCoin.change24h) : 0
+  readonly property int displayDirection: displayCoin ? Model.changeDirection(root.barChangePct) : 0
 
   readonly property real pillIconSize: Math.round(Style.bar.iconFont * 1.15)
 
@@ -94,9 +149,15 @@ Panel {
 
   function setPrimary(id) {
     if (!id || id === root.displayId) return
+    root.persistSettings({ primary: id })
+  }
+
+  // Merge a patch into the widget settings and write them back to this
+  // widget's shell.json entry, so the choice survives a restart.
+  function persistSettings(patch) {
     var entry = { id: root.moduleName }
     for (var key in root.settings) if (key !== "id") entry[key] = root.settings[key]
-    entry.primary = id
+    for (var field in patch) entry[field] = patch[field]
 
     var peers = root.bar && typeof root.bar.moduleWidgets === "function"
       ? root.bar.moduleWidgets(root.moduleName) : []
@@ -108,13 +169,70 @@ Panel {
       root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 
+  // Add a searched coin to the favorites and pin it to the bar.
+  function addCoin(id) {
+    var wanted = String(id || "").toLowerCase()
+    if (wanted === "") return
+    var ids = service.ids.slice()
+    if (ids.indexOf(wanted) === -1) ids.push(wanted)
+    root.persistSettings({ coins: ids.join(","), primary: wanted })
+    root.clearSearch()
+    Qt.callLater(function() { if (searchField) searchField.forceActiveFocus() })
+  }
+
+  // Drop a coin from the favorites. If the pinned coin is the one removed,
+  // fall back to the first remaining favorite (or reset to the default).
+  function removeCoin(id) {
+    var wanted = String(id || "").toLowerCase()
+    if (wanted === "") return
+    var ids = service.ids.slice()
+    var index = ids.indexOf(wanted)
+    if (index === -1) return
+    ids.splice(index, 1)
+    var patch = { coins: ids.join(",") }
+    if (root.displayId === wanted) patch.primary = ids.length > 0 ? ids[0] : ""
+    root.persistSettings(patch)
+  }
+
+  function focusSearch() {
+    if (searchField) searchField.forceActiveFocus()
+  }
+
+  function clearSearch() {
+    searchDebounce.stop()
+    if (searchField && searchField.text !== "") searchField.text = ""
+    else service.clearSearch()
+    searchIndex = 0
+  }
+
+  function moveSearchCursor(step) {
+    var count = root.searchResults.length
+    if (count === 0) return
+    searchIndex = Math.max(0, Math.min(count - 1, searchIndex + step))
+    scrollItemIntoView(searchColumn && searchIndex < searchColumn.children.length
+      ? searchColumn.children[searchIndex] : null)
+  }
+
+  function activateSearch() {
+    if (root.searchResults.length === 0) return
+    var result = root.searchResults[Math.max(0, Math.min(searchIndex, root.searchResults.length - 1))]
+    if (result) root.addCoin(result.id)
+  }
+
   function cyclePrimary(step) {
     root.setPrimary(Model.stepPrimaryId(service.ids, root.displayId, step))
   }
 
+  // Persist the chosen chart range; the wheel/favorites logic does not touch it.
+  function setChartRange(key) {
+    var normalized = Model.chartRange(key).key
+    if (normalized !== root.chartRangeKey) root.persistSettings({ chartRange: normalized })
+    if (chartDebounce) chartDebounce.restart()
+  }
+
   function openCoinPage(coin) {
     if (!coin || !root.bar) return
-    root.bar.run("xdg-open " + root.bar.shellQuote(Model.coinPageUrl(coin.id)))
+    root.bar.run("xdg-open " + Util.shellQuote(Model.coinPageUrl(coin.id)))
   }
 
   function ensureCursor() {
@@ -147,10 +265,13 @@ Panel {
 
   function scrollCursorIntoView() {
     if (!coinColumn || coinIndex < 0 || coinIndex >= coinColumn.children.length) return
-    var item = coinColumn.children[coinIndex]
+    scrollItemIntoView(coinColumn.children[coinIndex])
+  }
+
+  function scrollItemIntoView(item) {
     if (!panelFlick || !item) return
     Qt.callLater(function() {
-      if (!item) return
+      if (!item || !panelFlick) return
       var margin = Style.space(6)
       var top = item.mapToItem(panelFlick.contentItem, 0, 0).y
       var bottom = top + item.height
@@ -167,12 +288,24 @@ Panel {
 
   onOpenedChanged: if (opened) {
     cursorActive = false
+    root.clearSearch()
     var index = Model.coinIndex(coins, displayId)
     coinIndex = index === -1 ? 0 : index
     if (panelFlick) panelFlick.contentY = 0
     service.refresh()
+    if (chartDebounce) chartDebounce.restart()
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
+
+  // Coalesces coin/range switches so selection flicker does not hammer the
+  // API. It tracks the selected (pinned) coin, not the hovered one.
+  Timer {
+    id: chartDebounce
+    interval: 200
+    onTriggered: service.ensureChart(root.displayCoin, root.chartRangeKey)
+  }
+
+  onDisplayCoinChanged: if (root.chartDebounce) root.chartDebounce.restart()
 
   Service {
     id: service
@@ -181,7 +314,10 @@ Panel {
 
   Connections {
     target: service
-    function onCoinsChanged() { root.ensureCursor() }
+    function onCoinsChanged() {
+      root.ensureCursor()
+      if (root.chartDebounce) root.chartDebounce.restart()
+    }
   }
 
   Timer {
@@ -189,6 +325,14 @@ Panel {
     repeat: true
     running: root.rotateSeconds > 0 && !root.opened && !pillHover.hovered
     onTriggered: pillSwap.restart()
+  }
+
+  // Coalesces typing into one search call, and never fires for a query the
+  // API would reject outright.
+  Timer {
+    id: searchDebounce
+    interval: 350
+    onTriggered: service.search(searchField.text)
   }
 
   SequentialAnimation {
@@ -221,6 +365,20 @@ Panel {
     function previous(): string { root.cyclePrimary(-1); return root.displayId }
     function primary(): string { return root.displayId }
     function price(): string { return root.barText }
+    function search(q: string): string { service.search(q); return "ok" }
+    function add(id: string): string { root.addCoin(id); return "ok" }
+    function remove(id: string): string { root.removeCoin(id); return "ok" }
+    function chart(range: string): string {
+      var key = Model.chartRange(range).key
+      if (key !== root.chartRangeKey) root.persistSettings({ chartRange: key })
+      service.ensureChart(root.displayCoin, key)
+      var label = Model.chartRange(key).label
+      var entry = service.chartFor(root.displayCoin, key)
+      if (entry) return label + " " + Model.formatChange(entry.pct)
+        + " (" + entry.points.length + " pts)"
+      if (service.chartError !== "") return label + " error: " + service.chartError
+      return label + " loading"
+    }
   }
 
   WidgetButton {
@@ -348,17 +506,20 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: searchField.activeFocus
       onMoveRequested: function(dx, dy) {
         if (!root.cursorActive) { root.cursorActive = true; return }
         root.moveCursor(dx, dy)
       }
       onActivateRequested: if (root.cursorActive) root.activateCursor()
+      onDeleteRequested: if (root.cursorActive && root.selectedCoin) root.removeCoin(root.selectedCoin.id)
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(t) {
         var key = String(t).toLowerCase()
         if (key === "r") root.refresh()
         else if (key === "o") root.openCoinPage(root.cursorActive ? root.selectedCoin : root.displayCoin)
+        else if (key === "/") root.focusSearch()
       }
 
       Flickable {
@@ -380,20 +541,20 @@ Panel {
           PanelHero {
             id: hero
             width: parent.width
-            title: root.selectedCoin ? root.selectedCoin.name : "Crypto"
-            meta: root.selectedCoin
-              ? Model.heroMeta(root.selectedCoin, service.currency, service.lastUpdated, service.stale)
+            title: root.displayCoin ? root.displayCoin.name : "Crypto"
+            meta: root.displayCoin
+              ? Model.heroMeta(root.displayCoin, service.currency, service.lastUpdated, service.stale)
               : (service.loading ? "loading…" : "no data")
-            detail: root.selectedCoin ? Model.formatChange(root.selectedCoin.change24h) : ""
+            detail: root.displayCoin ? Model.formatChange(root.displayCoin.change24h) : ""
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconOpacity: service.stale ? 0.5 : 1.0
             iconComponent: Component {
               CoinIcon {
-                coin: root.selectedCoin
-                cachedFile: service.iconFor(root.selectedCoin)
+                coin: root.displayCoin
+                cachedFile: service.iconFor(root.displayCoin)
                 size: Style.font.display
-                fallbackColor: root.changeColor(root.selectedCoin ? root.selectedCoin.change24h : NaN, root.foreground)
+                fallbackColor: root.changeColor(root.displayCoin ? root.displayCoin.change24h : NaN, root.foreground)
                 fontFamily: root.fontFamily
               }
             }
@@ -406,8 +567,8 @@ Panel {
             Text {
 
               textFormat: Text.PlainText
-              text: root.selectedCoin
-                ? Model.formatPrice(root.selectedCoin.price, service.currency, false)
+              text: root.displayCoin
+                ? Model.formatPrice(root.displayCoin.price, service.currency, false)
                 : "—"
               color: root.foreground
               font.family: root.fontFamily
@@ -418,9 +579,10 @@ Panel {
             Text {
 
               textFormat: Text.PlainText
-              visible: root.selectedCoin !== null
-              text: Model.changeGlyph(root.selectedCoin ? root.selectedCoin.change24h : NaN) + " 24h"
-              color: root.changeColor(root.selectedCoin ? root.selectedCoin.change24h : NaN, root.dim)
+              visible: root.displayCoin !== null
+              text: Model.changeGlyph(root.activeChartPct) + " "
+                + root.chartRangeLabel + (isFinite(root.activeChartPct) ? " " + Model.formatChange(root.activeChartPct) : "")
+              color: root.changeColor(root.activeChartPct, root.dim)
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
               anchors.bottom: parent.bottom
@@ -428,31 +590,83 @@ Panel {
             }
           }
 
+          Text {
+
+            textFormat: Text.PlainText
+            visible: text !== ""
+            width: parent.width
+            text: root.chartHeaderText
+            color: root.changeColor(root.activeChartPct, root.foreground)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            elide: Text.ElideRight
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(4)
+
+            Repeater {
+              model: Model.CHART_RANGES.length
+
+              RangePill {
+                required property int index
+                width: Style.space(32)
+                key: Model.CHART_RANGES[index].key
+                label: Model.CHART_RANGES[index].label
+                active: root.chartRangeKey === Model.CHART_RANGES[index].key
+              }
+            }
+
+            Text {
+
+              textFormat: Text.PlainText
+              visible: text !== ""
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.chartBusy ? "…" : ""
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+          }
+
           Sparkline {
             width: parent.width
-            coin: root.selectedCoin
+            coin: root.displayCoin
+            rangeKey: root.chartRangeKey
+          }
+
+          Text {
+
+            textFormat: Text.PlainText
+            visible: text !== ""
+            width: parent.width
+            text: service.chartError !== "" ? "Chart: " + service.chartError : ""
+            color: root.urgent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
           }
 
           Column {
-            visible: root.selectedCoin !== null
+            visible: root.displayCoin !== null
             width: parent.width
             spacing: Style.spacing.labelGap
 
             InfoPair {
               label: "24h high"
-              value: root.selectedCoin ? Model.formatPrice(root.selectedCoin.high24h, service.currency, root.compactPrice) : "—"
+              value: root.displayCoin ? Model.formatPrice(root.displayCoin.high24h, service.currency, root.compactPrice) : "—"
             }
             InfoPair {
               label: "24h low"
-              value: root.selectedCoin ? Model.formatPrice(root.selectedCoin.low24h, service.currency, root.compactPrice) : "—"
+              value: root.displayCoin ? Model.formatPrice(root.displayCoin.low24h, service.currency, root.compactPrice) : "—"
             }
             InfoPair {
               label: "Market cap"
-              value: root.selectedCoin ? Model.formatLargeCurrency(root.selectedCoin.marketCap, service.currency) : "—"
+              value: root.displayCoin ? Model.formatLargeCurrency(root.displayCoin.marketCap, service.currency) : "—"
             }
             InfoPair {
               label: "24h volume"
-              value: root.selectedCoin ? Model.formatLargeCurrency(root.selectedCoin.volume, service.currency) : "—"
+              value: root.displayCoin ? Model.formatLargeCurrency(root.displayCoin.volume, service.currency) : "—"
             }
           }
 
@@ -491,6 +705,94 @@ Panel {
             }
           }
 
+          PanelSeparator {
+            foreground: root.foreground
+          }
+
+          Column {
+            width: parent.width
+            spacing: Style.space(10)
+
+            PanelSectionHeader {
+              text: "ADD A COIN"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            TextField {
+              id: searchField
+              width: parent.width
+              placeholderText: "Search any coin to add it…"
+              foreground: root.foreground
+              font.family: root.fontFamily
+
+              onTextChanged: {
+                root.searchIndex = 0
+                if (text === "") {
+                  searchDebounce.stop()
+                  service.clearSearch()
+                } else if (root.opened) {
+                  searchDebounce.restart()
+                }
+              }
+
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) {
+                  if (text !== "") text = ""
+                  else keyCatcher.forceActiveFocus()
+                  event.accepted = true
+                } else if (event.key === Qt.Key_Down) {
+                  root.moveSearchCursor(1)
+                  event.accepted = true
+                } else if (event.key === Qt.Key_Up) {
+                  root.moveSearchCursor(-1)
+                  event.accepted = true
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                  root.activateSearch()
+                  event.accepted = true
+                }
+              }
+            }
+
+            Text {
+
+              textFormat: Text.PlainText
+              visible: text !== ""
+              width: parent.width
+              text: {
+                var query = Model.searchText(searchField.text)
+                if (query.length < Model.MIN_SEARCH_LENGTH) return ""
+                if (service.searching || searchDebounce.running) return "Searching…"
+                if (service.searchError !== "") return service.searchError
+                if (root.searchResults.length > 0) return ""
+                return service.searchResults.length > 0 ? "Already in your favorites" : "No coins found"
+              }
+              color: service.searchError !== "" ? root.urgent : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
+
+            Column {
+              id: searchColumn
+              visible: root.searchResults.length > 0
+              width: parent.width
+              spacing: Style.space(6)
+
+              Repeater {
+                model: root.searchResults
+
+                SearchRow {
+                  required property var modelData
+                  required property int index
+                  width: searchColumn.width
+                  coin: modelData
+                  rowIndex: index
+                }
+              }
+            }
+          }
+
           Text {
 
             textFormat: Text.PlainText
@@ -512,7 +814,7 @@ Panel {
 
             textFormat: Text.PlainText
             width: parent.width
-            text: "↑↓ select · enter pin · r refresh · o coingecko"
+            text: "/ search · ↑↓ select · enter pin · x remove · r refresh · o coingecko"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -526,20 +828,82 @@ Panel {
   component Sparkline: Item {
     id: spark
     property var coin: null
-    readonly property var series: coin ? Model.sparklinePoints(coin.sparkline, 96) : null
+    property string rangeKey: "1w"
+
+    readonly property var chart: coin ? service.chartFor(coin, spark.rangeKey) : null
+
+    // Keep the last good chart drawn while a new range (or coin) is being
+    // fetched, and never fall back to a blank graph: the coin's free
+    // sparkline data steps in immediately, so the chart only truly blanks
+    // before the first market load.
+    property var retainedChart: null
+    property string retainedCoinId: ""
+    readonly property var displayChart: {
+      if (spark.chart) return spark.chart
+      if (spark.retainedChart && spark.retainedChart.key === spark.rangeKey
+        && spark.retainedCoinId === (spark.coin ? spark.coin.id : "")) return spark.retainedChart
+      if (spark.coin) {
+        var points = Model.sparklineChart(spark.coin, Model.chartRange(spark.rangeKey))
+        if (points.length >= 2)
+          return { key: spark.rangeKey, label: Model.chartRange(spark.rangeKey).label, points: points, pct: NaN }
+      }
+      return null
+    }
+    readonly property var series: spark.displayChart ? Model.chartSeries(spark.displayChart.points, 128) : null
     readonly property color strokeColor: root.changeColor(
-      coin ? Model.sparklineChange(coin.sparkline) : NaN, root.foreground)
+      spark.displayChart && isFinite(spark.displayChart.pct) ? spark.displayChart.pct : NaN, root.foreground)
 
-    visible: series !== null
-    implicitHeight: visible ? Style.space(52) : 0
+    property int hoverIndex: -1
 
-    onSeriesChanged: canvas.requestPaint()
+    visible: spark.displayChart !== null
+    readonly property bool loading: spark.chart === null
+    implicitHeight: visible ? Style.space(104) : 0
+
+    readonly property int seriesCount: spark.series ? spark.series.values.length : 0
+    readonly property int hoverPointIndex: {
+      if (spark.hoverIndex < 0 || !spark.series) return -1
+      var indices = spark.series.indices
+      if (spark.hoverIndex >= indices.length) return -1
+      return indices[spark.hoverIndex]
+    }
+    readonly property var hoverPoint: {
+      var i = spark.hoverPointIndex
+      if (i < 0 || !spark.chart || i >= spark.chart.points.length) return null
+      return spark.chart.points[i]
+    }
+    readonly property real hoverX: {
+      if (spark.hoverIndex < 0 || spark.seriesCount < 2) return 0
+      return spark.hoverIndex / (spark.seriesCount - 1) * spark.width
+    }
+    readonly property real hoverY: {
+      var s = spark.series
+      if (!s || spark.hoverIndex < 0) return 0
+      var usable = Math.max(1, spark.height - 4)
+      return 2 + (1 - s.values[spark.hoverIndex]) * usable
+    }
+    readonly property real hoverDeltaPct: {
+      var p = spark.hoverPoint
+      if (!p || !spark.chart || spark.chart.points.length < 2
+        || !isFinite(spark.chart.points[0].p) || spark.chart.points[0].p === 0) return NaN
+      return ((p.p - spark.chart.points[0].p) / spark.chart.points[0].p) * 100
+    }
+
+    onSeriesChanged: { spark.hoverIndex = -1; canvas.requestPaint() }
     onStrokeColorChanged: canvas.requestPaint()
+    onHoverIndexChanged: canvas.requestPaint()
+    onChartChanged: {
+      if (spark.chart) {
+        spark.retainedChart = spark.chart
+        spark.retainedCoinId = spark.coin ? spark.coin.id : ""
+      }
+      canvas.requestPaint()
+    }
 
     Canvas {
       id: canvas
       anchors.fill: parent
       antialiasing: true
+      opacity: spark.loading ? 0.45 : 1
 
       onPaint: {
         var ctx = getContext("2d")
@@ -569,7 +933,162 @@ Panel {
         ctx.closePath()
         ctx.fillStyle = Qt.rgba(spark.strokeColor.r, spark.strokeColor.g, spark.strokeColor.b, 0.12)
         ctx.fill()
+
+        if (spark.hoverIndex >= 0 && spark.hoverIndex < values.length) {
+          var hx = spark.hoverX
+          var hy = spark.hoverY
+
+          ctx.strokeStyle = Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.28)
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(hx, inset)
+          ctx.lineTo(hx, height - inset)
+          ctx.moveTo(0, hy)
+          ctx.lineTo(width, hy)
+          ctx.stroke()
+
+          ctx.fillStyle = spark.strokeColor
+          ctx.beginPath()
+          ctx.arc(hx, hy, 2.5, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.lineWidth = 1
+          ctx.strokeStyle = Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.55)
+          ctx.beginPath()
+          ctx.arc(hx, hy, 4.5, 0, Math.PI * 2)
+          ctx.stroke()
+        }
       }
+    }
+
+    MouseArea {
+      id: sparkMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+      onPositionChanged: function(mouse) {
+        if (spark.seriesCount < 2) { spark.hoverIndex = -1; return }
+        spark.hoverIndex = Math.max(0, Math.min(spark.seriesCount - 1,
+          Math.round(mouse.x / Math.max(1, width) * (spark.seriesCount - 1))))
+      }
+      onExited: spark.hoverIndex = -1
+    }
+
+    // Follow-the-mouse price badge: price, date/time and gain since the start
+    // of the range, flipping to the other side of the point near the edges.
+    Item {
+      id: badge
+      visible: spark.hoverPoint !== null
+      z: 5
+      width: Math.max(Style.space(120), badgeRow.implicitWidth + Style.space(16))
+      height: badgeRow.implicitHeight + Style.space(10)
+
+      x: {
+        var x = spark.hoverIndex / Math.max(1, spark.seriesCount - 1) * spark.width
+        var left = x > spark.width / 2 ? x - badge.width - Style.space(8) : x + Style.space(8)
+        return Math.max(0, Math.min(spark.width - badge.width, left))
+      }
+      y: {
+        var above = spark.hoverY - badge.height - Style.space(8)
+        if (above >= Style.space(2)) return above
+        return Math.min(spark.height - badge.height - Style.space(2), spark.hoverY + Style.space(10))
+      }
+
+      Rectangle {
+        anchors.fill: parent
+        radius: Style.space(5)
+        color: Color.tooltip.background
+        border.color: Color.tooltip.border
+        border.width: 1
+      }
+
+      Row {
+        id: badgeRow
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: Style.space(8)
+        anchors.rightMargin: Style.space(8)
+        spacing: Style.space(10)
+
+        Column {
+          width: badgeRow.width - badgeDelta.implicitWidth - badgeRow.spacing - Style.space(16)
+          spacing: Style.space(2)
+
+          Text {
+
+            textFormat: Text.PlainText
+            text: {
+              var p = spark.hoverPoint
+              return p ? Model.formatPrice(p.p, service.currency, false) : "—"
+            }
+            color: Color.tooltip.text
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            elide: Text.ElideRight
+          }
+
+          Text {
+
+            textFormat: Text.PlainText
+            text: {
+              var p = spark.hoverPoint
+              if (!p) return ""
+              return Qt.formatDateTime(new Date(p.t), "d MMM · HH:mm")
+            }
+            color: Qt.darker(Color.tooltip.text, 1.45)
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+        }
+
+        Text {
+          id: badgeDelta
+
+          textFormat: Text.PlainText
+          anchors.verticalCenter: parent.verticalCenter
+          text: isFinite(spark.hoverDeltaPct) ? Model.formatChange(spark.hoverDeltaPct) : ""
+          color: root.changeColor(spark.hoverDeltaPct, Qt.darker(Color.tooltip.text, 1.45))
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+      }
+    }
+  }
+
+  component RangePill: Item {
+    id: range
+    property string key: ""
+    property string label: ""
+    property bool active: false
+    signal clicked
+
+    implicitWidth: rangeLabel.implicitWidth + Style.space(12)
+    implicitHeight: Math.max(Style.space(18), rangeLabel.implicitHeight + Style.space(6))
+
+    Rectangle {
+      anchors.fill: parent
+      radius: Style.space(4)
+      color: range.active
+        ? Style.hoverFillFor(root.foreground, Color.accent)
+        : (area.containsMouse ? Style.hoverFillFor(root.foreground, root.foreground) : "transparent")
+    }
+
+    Text {
+      id: rangeLabel
+      anchors.centerIn: parent
+      text: range.label
+      color: range.active ? Color.accent : (area.containsMouse ? root.foreground : root.dim)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      textFormat: Text.PlainText
+    }
+
+    MouseArea {
+      id: area
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.setChartRange(range.key)
     }
   }
 
@@ -603,6 +1122,38 @@ Panel {
       anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
+
+      // Remove affordance — its own MouseArea sits above the pin/select one,
+      // so clicking it never pins the row.
+      Item {
+        width: Style.space(16)
+        height: Style.space(16)
+        Layout.alignment: Qt.AlignVCenter
+
+        Rectangle {
+          anchors.fill: parent
+          radius: Style.space(3)
+          color: removeArea.containsMouse ? Style.hoverFillFor(root.foreground, root.urgent) : "transparent"
+        }
+
+        Text {
+
+          textFormat: Text.PlainText
+          anchors.centerIn: parent
+          text: "x"
+          color: removeArea.containsMouse ? root.urgent : Qt.darker(root.foreground, 1.6)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
+        MouseArea {
+          id: removeArea
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.removeCoin(coinRow.coin ? coinRow.coin.id : "")
+        }
+      }
 
       CoinIcon {
         coin: coinRow.coin
@@ -665,6 +1216,87 @@ Panel {
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
         }
+      }
+    }
+  }
+
+  component SearchRow: CursorSurface {
+    id: searchRow
+    property var coin: null
+    property int rowIndex: 0
+
+    hasCursor: root.searchIndex === rowIndex
+    current: false
+    foreground: root.foreground
+    implicitHeight: searchRowContent.implicitHeight + Style.spacing.rowPaddingX
+
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onEntered: root.searchIndex = searchRow.rowIndex
+      onClicked: root.addCoin(searchRow.coin ? searchRow.coin.id : "")
+    }
+
+    RowLayout {
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      CoinIcon {
+        coin: searchRow.coin
+        cachedFile: service.iconFor(searchRow.coin)
+        size: Style.font.icon
+        fallbackColor: searchRow.hasCursor ? Color.accent : root.dim
+        fontFamily: root.fontFamily
+        Layout.alignment: Qt.AlignVCenter
+      }
+
+      ColumnLayout {
+        id: searchRowContent
+        Layout.fillWidth: true
+        spacing: Style.space(1)
+
+        Text {
+
+          textFormat: Text.PlainText
+          Layout.fillWidth: true
+          text: searchRow.coin ? searchRow.coin.name : ""
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+
+        Text {
+
+          textFormat: Text.PlainText
+          Layout.fillWidth: true
+          text: {
+            if (!searchRow.coin) return ""
+            var bits = [searchRow.coin.symbol]
+            if (isFinite(searchRow.coin.rank) && searchRow.coin.rank > 0)
+              bits.push("#" + Math.round(searchRow.coin.rank))
+            return bits.join("  ·  ")
+          }
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+      }
+
+      Text {
+
+        textFormat: Text.PlainText
+        Layout.alignment: Qt.AlignRight
+        text: "+"
+        color: searchRow.hasCursor ? Color.accent : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
       }
     }
   }

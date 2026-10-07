@@ -1,13 +1,31 @@
 var API_BASE = "https://api.coingecko.com/api/v3/coins/markets"
-var DEFAULT_COIN = "bitcoin"
+var SEARCH_API = "https://api.coingecko.com/api/v3/search"
+var MARKET_CHART_API = "https://api.coingecko.com/api/v3/coins/"
 var COIN_PAGE = "https://www.coingecko.com/en/coins/"
+var DEFAULT_COIN = "bitcoin"
+
+// Chart ranges shown in the popup. hours > 0 slices the trailing window out
+// of a days=1 response (5-minute points); days=max falls back to one year
+// when the free API rejects it (it currently answers "max" with a 401).
+var CHART_RANGES = [
+  { key: "1h", label: "1H", days: 1, hours: 1, max: 64 },
+  { key: "4h", label: "4H", days: 1, hours: 4, max: 96 },
+  { key: "1d", label: "1D", days: 1, hours: 0, max: 128 },
+  { key: "1w", label: "1W", days: 7, hours: 0, max: 96 },
+  { key: "1m", label: "1M", days: 30, hours: 0, max: 128 },
+  { key: "all", label: "ALL", days: "max", hours: 0, max: 160, fallbackDays: 365 }
+]
 
 // Bounds on API-controlled data, so a compromised endpoint cannot grow memory
 // without limit: the byte cap is enforced by curl --max-filesize and re-checked
 // before JSON.parse, the item caps while normalizing the parsed payload.
 var MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 var MAX_COINS = 250
+var MAX_SEARCH_RESULTS = 8
+var MIN_SEARCH_LENGTH = 2
 var MAX_SPARKLINE_POINTS = 512
+var MAX_CHART_RAW_POINTS = 6000
+var MAX_CHART_POINTS = 160
 var MAX_IMAGE_URL_LENGTH = 2048
 var MAX_TEXT_LENGTH = 64
 
@@ -120,6 +138,162 @@ function marketsUrl(ids, currency) {
 
 function coinPageUrl(id) {
   return COIN_PAGE + encodeURIComponent(String(id || ""))
+}
+
+function chartRange(key) {
+  var want = String(key || "1w").toLowerCase()
+  for (var i = 0; i < CHART_RANGES.length; ++i) {
+    if (CHART_RANGES[i].key === want) return CHART_RANGES[i]
+  }
+  return CHART_RANGES[3]
+}
+
+function chartRangeLabel(key) {
+  return chartRange(key).label
+}
+
+function chartCacheKey(id, rangeKey) {
+  return String(id || "") + "|" + chartRange(rangeKey).key
+}
+
+function marketChartUrl(id, currency, range) {
+  id = String(id || "")
+  if (id === "" || !range || range.days === undefined) return ""
+  return MARKET_CHART_API + encodeURIComponent(id)
+    + "/market_chart?vs_currency=" + encodeURIComponent(currencyCode(currency))
+    + "&days=" + encodeURIComponent(String(range.days))
+}
+
+// Parse a market_chart payload into [{t,p}, ...] points: small trailing
+// windows (1h/4h) are sliced out, everything is downsampled to the range's
+// drawing budget so a course 30-day line stays light.
+function parseChart(raw, range) {
+  var parsed = JSON.parse(String(raw))
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.prices))
+    throw new Error("unexpected chart response shape")
+
+  var points = []
+  var count = Math.min(parsed.prices.length, MAX_CHART_RAW_POINTS)
+  for (var i = 0; i < count; ++i) {
+    var pair = parsed.prices[i]
+    var value = toNumber(pair && pair[1])
+    if (!isFinite(value) || pair[0] === undefined) continue
+    points.push({ t: pair[0], p: value })
+  }
+  if (points.length < 2) return []
+  if (range && range.hours > 0) points = tailWindow(points, range.hours * 3600000)
+  return downsampleChart(points, range && range.max ? range.max : MAX_CHART_POINTS)
+}
+
+function tailWindow(points, ms) {
+  var end = points[points.length - 1].t
+  var start = end - ms
+  var tail = []
+  for (var i = points.length - 1; i >= 0; --i) {
+    if (points[i].t < start) break
+    tail.push(points[i])
+  }
+  tail.reverse()
+  return tail.length >= 2 ? tail : points.slice()
+}
+
+function downsampleChart(points, maxPoints) {
+  if (points.length <= maxPoints) return points
+  var count = Math.max(2, Math.round(Number(maxPoints)) || MAX_CHART_POINTS)
+  var step = (points.length - 1) / (count - 1)
+  var out = []
+  for (var i = 0; i < count; ++i) {
+    var index = Math.min(points.length - 1, Math.round(i * step))
+    out.push(points[index])
+  }
+  return out
+}
+
+function chartChange(points) {
+  if (!points || points.length < 2) return NaN
+  return sparklineChange([toNumber(points[0].p), toNumber(points[points.length - 1].p)])
+}
+
+// The 7-day range reuses the sparkline already returned by the markets API,
+// so the default chart never costs an extra request.
+function sparklineChart(coin, range) {
+  if (!coin || !Array.isArray(coin.sparkline) || coin.sparkline.length < 2) return []
+  var now = Date.now()
+  var start = now - 7 * 86400000
+  var points = []
+  for (var i = 0; i < coin.sparkline.length && i < MAX_SPARKLINE_POINTS; ++i) {
+    var value = toNumber(coin.sparkline[i])
+    if (!isFinite(value)) continue
+    points.push({
+      t: start + Math.round((now - start) * i / (coin.sparkline.length - 1)),
+      p: value
+    })
+  }
+  return downsampleChart(points, range && range.max ? range.max : MAX_CHART_POINTS)
+}
+
+function chartSeries(points, buckets) {
+  if (!points || points.length < 2) return null
+  var count = Math.max(2, Math.min(buckets || 96, points.length))
+  var step = (points.length - 1) / (count - 1)
+  var values = []
+  var indices = []
+  var min = Infinity
+  var max = -Infinity
+  for (var i = 0; i < count; ++i) {
+    var index = Math.round(i * step)
+    var value = points[index].p
+    if (!isFinite(value)) continue
+    indices.push(index)
+    values.push(value)
+    if (value < min) min = value
+    if (value > max) max = value
+  }
+  if (values.length < 2) return null
+  var span = max - min
+  var normalized = []
+  for (var j = 0; j < values.length; ++j) {
+    normalized.push(span === 0 ? 0.5 : (values[j] - min) / span)
+  }
+  return { values: normalized, min: min, max: max, indices: indices }
+}
+
+function searchText(raw) {
+  return String(raw === undefined || raw === null ? "" : raw).replace(/^\s+|\s+$/g, "")
+}
+
+// Empty means "do not search": too short a query floods the free API and
+// returns nothing useful anyway.
+function searchUrl(query) {
+  var text = searchText(query)
+  if (text.length < MIN_SEARCH_LENGTH) return ""
+  return SEARCH_API + "?query=" + encodeURIComponent(text)
+}
+
+function parseSearch(raw) {
+  var parsed = JSON.parse(String(raw))
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.coins))
+    throw new Error("unexpected search response shape")
+
+  var results = []
+  var seen = {}
+  var count = Math.min(parsed.coins.length, MAX_COINS)
+  for (var i = 0; i < count; ++i) {
+    var entry = parsed.coins[i]
+    if (!entry || typeof entry !== "object" || !entry.id) continue
+    var id = clampText(entry.id, "").toLowerCase()
+    if (id === "" || seen[id]) continue
+    seen[id] = true
+    results.push({
+      id: id,
+      name: clampText(entry.name, id),
+      symbol: clampText(entry.symbol, "").toUpperCase(),
+      rank: toNumber(entry.market_cap_rank),
+      image: safeImageUrl(entry.thumb)
+    })
+    if (results.length >= MAX_SEARCH_RESULTS) break
+  }
+  return results
 }
 
 function toNumber(value) {
@@ -293,11 +467,13 @@ function glyphFor(coin) {
 
 function barLabel(coin, options) {
   if (!coin) return ""
+  var pct = isFinite(options.changePct) ? options.changePct : coin.change24h
   var parts = []
-  if (options.showSymbol && coin.symbol !== "") parts.push(coin.symbol)
-  parts.push(formatPrice(coin.price, options.currency, options.compactPrice))
-  if (options.showChange) {
-    var change = formatChange(coin.change24h)
+  if (options.showSymbol !== false && coin.symbol !== "") parts.push(coin.symbol)
+  if (options.showPrice !== false)
+    parts.push(formatPrice(coin.price, options.currency, options.compactPrice))
+  if (options.showChange !== false) {
+    var change = formatChange(pct)
     if (change !== "") parts.push(change)
   }
   return parts.join(" ")
@@ -315,9 +491,15 @@ function widestBarLabel(coins, options) {
 
 function verticalBarLines(coin, options) {
   if (!coin) return []
+  var pct = isFinite(options.changePct) ? options.changePct : coin.change24h
   var lines = []
-  if (options.showSymbol && coin.symbol !== "") lines.push(coin.symbol)
-  lines.push(isFinite(coin.price) ? compactNumber(coin.price) : "—")
+  if (options.showSymbol !== false && coin.symbol !== "") lines.push(coin.symbol)
+  if (options.showPrice !== false)
+    lines.push(isFinite(coin.price) ? compactNumber(coin.price) : "—")
+  if (options.showChange !== false) {
+    var change = formatChange(pct)
+    if (change !== "") lines.push(change)
+  }
   return lines
 }
 
