@@ -48,7 +48,7 @@ Item {
 
   // Remote coin images, downloaded one at a time through Model.IMAGE_FETCH_SCRIPT.
   // iconFiles maps the API image URL to the validated local file:// URL.
-  readonly property string imageCacheDir: Quickshell.cachePath("thales.crypto/icons")
+  readonly property string imageCacheDir: Quickshell.cachePath("ecalho.crypto/icons")
   property var iconFiles: ({})
   property var imageQueue: []
   property var imageRequested: ({})
@@ -341,7 +341,7 @@ Item {
           next[job.url] = "file://" + encodeURI(job.file)
           root.iconFiles = next
         } else {
-          console.warn("thales.crypto: icon for " + job.id + " rejected (exit " + exitCode + ")",
+          console.warn("ecalho.crypto: icon for " + job.id + " rejected (exit " + exitCode + ")",
             String(imageErr.text || "").slice(0, 200))
         }
       }

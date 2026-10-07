@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "thales.crypto",
+  "id": "ecalho.crypto",
   "name": "Crypto",
   "version": "1.0.0",
-  "author": "Thales Augusto",
+  "author": "ecalho",
   "license": "MIT",
   "description": "Bitcoin and favorite crypto prices in the Omarchy bar — coin logos, 24h change, 7-day sparkline, market stats.",
   "kinds": [

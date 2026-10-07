@@ -8,8 +8,8 @@ import "Model.js" as Model
 
 Panel {
   id: root
-  moduleName: "thales.crypto"
-  ipcTarget: "thales.crypto"
+  moduleName: "ecalho.crypto"
+  ipcTarget: "ecalho.crypto"
   manageIpc: false
 
   property int coinIndex: 0

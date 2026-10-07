@@ -46,7 +46,7 @@ runtime:
 
 No package is installed and no service is started. Besides
 `~/.config/omarchy`, the only thing written is the logo cache under the
-Quickshell cache directory (`~/.cache/quickshell/by-shell/<hash>/thales.crypto/icons`).
+Quickshell cache directory (`~/.cache/quickshell/by-shell/<hash>/ecalho.crypto/icons`).
 
 ## Install
 
@@ -66,17 +66,17 @@ omarchy plugin add git@github.com:ecalho/omarchy-crypto.git --enable --yes
 Or by hand, from a clone of this repo:
 
 ```bash
-ln -s "$PWD" ~/.config/omarchy/plugins/thales.crypto
+ln -s "$PWD" ~/.config/omarchy/plugins/ecalho.crypto
 omarchy-shell shell rescanPlugins
-omarchy plugin enable thales.crypto
+omarchy plugin enable ecalho.crypto
 ```
 
-Move it around the bar with `omarchy bar move thales.crypto left|center|right`.
+Move it around the bar with `omarchy bar move ecalho.crypto left|center|right`.
 
 ## Remove
 
 ```bash
-omarchy plugin remove thales.crypto --yes
+omarchy plugin remove ecalho.crypto --yes
 ```
 
 That disables the widget, deletes or unlinks the plugin folder, and rescans.
@@ -87,7 +87,7 @@ The widget's settings live in its entry in `~/.config/omarchy/shell.json`, under
 entry in place. Drop it from Setup > Plugins, or by hand:
 
 ```bash
-jq 'del(.bar.layout[][] | select(.id == "thales.crypto"))' \
+jq 'del(.bar.layout[][] | select(.id == "ecalho.crypto"))' \
   ~/.config/omarchy/shell.json > /tmp/shell.json &&
   mv /tmp/shell.json ~/.config/omarchy/shell.json
 ```
@@ -243,7 +243,7 @@ Example:
 
 ```json
 {
-  "id": "thales.crypto",
+  "id": "ecalho.crypto",
   "coins": "bitcoin,ethereum,solana,dogecoin",
   "currency": "brl",
   "primary": "bitcoin",
@@ -286,15 +286,15 @@ before falling back to the normal cadence.
 ## IPC
 
 ```bash
-omarchy-shell thales.crypto toggle     # open/close the popup
-omarchy-shell thales.crypto refresh    # fetch now
-omarchy-shell thales.crypto next       # pin the next favorite to the bar
-omarchy-shell thales.crypto rotate     # advance the rotation without pinning
-omarchy-shell thales.crypto price      # print the current bar label
-omarchy-shell thales.crypto search "sol"      # query CoinGecko (results pop the UI)
-omarchy-shell thales.crypto add dogecoin      # add a coin to favorites and pin it
-omarchy-shell thales.crypto remove dogecoin   # drop a coin from favorites
-omarchy-shell thales.crypto chart "1m"        # switch chart range and print its change
+omarchy-shell ecalho.crypto toggle     # open/close the popup
+omarchy-shell ecalho.crypto refresh    # fetch now
+omarchy-shell ecalho.crypto next       # pin the next favorite to the bar
+omarchy-shell ecalho.crypto rotate     # advance the rotation without pinning
+omarchy-shell ecalho.crypto price      # print the current bar label
+omarchy-shell ecalho.crypto search "sol"      # query CoinGecko (results pop the UI)
+omarchy-shell ecalho.crypto add dogecoin      # add a coin to favorites and pin it
+omarchy-shell ecalho.crypto remove dogecoin   # drop a coin from favorites
+omarchy-shell ecalho.crypto chart "1m"        # switch chart range and print its change
 ```
 
 ## Files
