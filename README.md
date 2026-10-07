@@ -54,15 +54,6 @@ Quickshell cache directory (`~/.cache/quickshell/by-shell/<hash>/ecalho.crypto/i
 omarchy plugin add https://github.com/ecalho/omarchy-crypto.git --enable --yes
 ```
 
-The repo is private, so the machine needs credentials *before* this command.
-Easiest: `gh auth login` on it — that installs the git credential helper
-`omarchy plugin add` reads (the command runs with `GIT_TERMINAL_PROMPT=0`, so
-nothing can ever prompt). An ssh key works too, with the scp form instead:
-
-```bash
-omarchy plugin add git@github.com:ecalho/omarchy-crypto.git --enable --yes
-```
-
 Or by hand, from a clone of this repo:
 
 ```bash
