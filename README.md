@@ -125,7 +125,7 @@ and are editable from Setup > Plugins.
 | `rotateSeconds`      | `10`                        | Seconds each coin holds the bar. `0` pins the bar to one coin |
 | `showIcon`           | `true`                      | Coin logo before the price |
 | `showSymbol`         | `true`                      | `BTC`, `ETH`, … before the price |
-| `showPrice`          | `true`                      | The price itself in the pill. Off → symbol + percentage only |
+| `barStyle`           | `full`                      | `full` = logo + ticker + price + percentage. `compact` = logo + ticker + percentage only (shorter pill) |
 | `showChange`         | `true`                      | Append the selected chart range's percentage to the label |
 | `compactPrice`       | `false`                     | `$78.9k` instead of `$78,851` |
 | `colorizeChange`     | `true`                      | Tint the bar label: theme accent when up, urgent when down |
@@ -195,10 +195,11 @@ It flips to the other side of the line near the edges so it never clips.
 
 ## Bar label
 
-The pill composes four independent toggles (Setup → Plugins → Coin ticker):
-`showIcon` (logo), `showSymbol` (e.g. `KAS`), `showPrice` (e.g. `$0.0430`) and
-`showChange`. So `KAS $0.0430 +2.4%` is just the default; turn `showPrice` off
-for a quiet `KAS +2.4%`, or keep any combination you like.
+The pill's length is set by the **Bar layout** setting (Setup → Plugins →
+Coin ticker). `full` shows the logo, ticker, price and percentage
+(`₿ BTC $78,851 -1.07%`); `compact` drops the price for a shorter pill
+(`₿ BTC -1.07%`). The `showIcon` (logo), `showSymbol` (e.g. `KAS`) and
+`showChange` toggles still trim it further, so any combination works.
 
 The percentage is the gain of whatever `chartRange` is selected — pick `1M` in
 the range pills and the bar follows with the 30-day change. It falls back to

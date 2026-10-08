@@ -70,7 +70,15 @@ Panel {
 
   readonly property bool showIcon: setting("showIcon", true) === true
   readonly property bool showSymbol: setting("showSymbol", true) === true
-  readonly property bool showPrice: setting("showPrice", true) === true
+  // Bar layout picks how much the pill shows: "full" keeps the price,
+  // "compact" drops it so the pill reads as logo + ticker + percentage only.
+  // A legacy `showPrice` toggle is still honoured when `barStyle` is unset.
+  readonly property string barStyle: {
+    var style = setting("barStyle", "")
+    if (style === "full" || style === "compact") return style
+    return setting("showPrice", true) === false ? "compact" : "full"
+  }
+  readonly property bool showPrice: root.barStyle !== "compact"
   readonly property bool showChange: setting("showChange", true) === true
   readonly property bool compactPrice: setting("compactPrice", false) === true
   readonly property bool colorizeChange: setting("colorizeChange", true) === true

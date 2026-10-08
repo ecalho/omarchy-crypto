@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ecalho.crypto",
   "name": "Crypto",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "ecalho",
   "license": "MIT",
   "description": "Bitcoin and favorite crypto prices in the Omarchy bar — coin logos, 24h change, 7-day sparkline, market stats.",
@@ -28,7 +28,7 @@
       "chartRange": "1w",
       "showIcon": true,
       "showSymbol": true,
-      "showPrice": true,
+      "barStyle": "full",
       "showChange": true,
       "compactPrice": false,
       "colorizeChange": true
@@ -83,11 +83,12 @@
         "defaultValue": true
       },
       {
-        "key": "showPrice",
-        "type": "boolean",
-        "label": "Show price",
-        "description": "Show the price in the bar pill. Turn it off for a label with only the ticker symbol and the percentage.",
-        "defaultValue": true
+        "key": "barStyle",
+        "type": "enum",
+        "label": "Bar layout",
+        "options": ["full", "compact"],
+        "defaultValue": "full",
+        "description": "full shows the logo, ticker, price and percentage. compact drops the price for a shorter pill (logo, ticker and percentage only)."
       },
       {
         "key": "showChange",
