@@ -2,7 +2,8 @@ var API_BASE = "https://api.coingecko.com/api/v3/coins/markets"
 var SEARCH_API = "https://api.coingecko.com/api/v3/search"
 var MARKET_CHART_API = "https://api.coingecko.com/api/v3/coins/"
 var COIN_PAGE = "https://www.coingecko.com/en/coins/"
-var DEFAULT_COIN = "bitcoin"
+// Followed out of the box, in this order, when no `coins` setting is present.
+var DEFAULT_COINS = ["bitcoin", "ethereum", "kaspa"]
 
 // Chart ranges shown in the popup. hours > 0 slices the trailing window out
 // of a days=1 response (5-minute points); days=max falls back to one year
@@ -119,7 +120,7 @@ function coinIds(raw) {
     seen[id] = true
     ids.push(id)
   }
-  return ids.length > 0 ? ids : [DEFAULT_COIN]
+  return ids.length > 0 ? ids : DEFAULT_COINS.slice()
 }
 
 function currencyCode(raw) {

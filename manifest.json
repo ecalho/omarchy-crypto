@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ecalho.crypto",
   "name": "Crypto",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "ecalho",
   "license": "MIT",
   "description": "Bitcoin and favorite crypto prices in the Omarchy bar — coin logos, 24h change, 7-day sparkline, market stats.",
@@ -20,7 +20,7 @@
     "defaultSection": "right",
     "allowMultiple": false,
     "defaults": {
-      "coins": "bitcoin",
+      "coins": "bitcoin,ethereum,kaspa",
       "currency": "usd",
       "primary": "",
       "refreshIntervalSec": 120,
@@ -38,8 +38,8 @@
         "key": "coins",
         "type": "string",
         "label": "Favorite coins",
-        "description": "CoinGecko coin ids, comma-separated, in display order. Find an id in the URL of a coin page on coingecko.com (e.g. bitcoin, ethereum, solana, dogecoin). Empty means bitcoin.",
-        "defaultValue": "bitcoin"
+        "description": "CoinGecko coin ids, comma-separated, in display order. Find an id in the URL of a coin page on coingecko.com (e.g. bitcoin, ethereum, solana, dogecoin). Empty means bitcoin, ethereum and kaspa.",
+        "defaultValue": "bitcoin,ethereum,kaspa"
       },
       {
         "key": "currency",

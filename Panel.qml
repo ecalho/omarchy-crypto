@@ -238,6 +238,13 @@ Panel {
     if (chartDebounce) chartDebounce.restart()
   }
 
+  // Bar layout: "full" keeps the price, "compact" drops it. Written back to
+  // shell.json like every other choice made from the popup.
+  function setBarStyle(style) {
+    var wanted = style === "compact" ? "compact" : "full"
+    if (wanted !== root.barStyle) root.persistSettings({ barStyle: wanted })
+  }
+
   function openCoinPage(coin) {
     if (!coin || !root.bar) return
     root.bar.run("xdg-open " + Util.shellQuote(Model.coinPageUrl(coin.id)))
@@ -635,6 +642,35 @@ Panel {
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
+            }
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(8)
+
+            Text {
+
+              textFormat: Text.PlainText
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Bar layout"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Repeater {
+              model: [
+                { key: "full", label: "Full" },
+                { key: "compact", label: "Compact" }
+              ]
+
+              BarStylePill {
+                required property var modelData
+                label: modelData.label
+                active: root.barStyle === modelData.key
+                onClicked: root.setBarStyle(modelData.key)
+              }
             }
           }
 
@@ -1097,6 +1133,42 @@ Panel {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: root.setChartRange(range.key)
+    }
+  }
+
+  component BarStylePill: Item {
+    id: stylePill
+    property string label: ""
+    property bool active: false
+    signal clicked
+
+    implicitWidth: styleLabel.implicitWidth + Style.space(12)
+    implicitHeight: Math.max(Style.space(18), styleLabel.implicitHeight + Style.space(6))
+
+    Rectangle {
+      anchors.fill: parent
+      radius: Style.space(4)
+      color: stylePill.active
+        ? Style.hoverFillFor(root.foreground, Color.accent)
+        : (styleArea.containsMouse ? Style.hoverFillFor(root.foreground, root.foreground) : "transparent")
+    }
+
+    Text {
+      id: styleLabel
+      anchors.centerIn: parent
+      text: stylePill.label
+      color: stylePill.active ? Color.accent : (styleArea.containsMouse ? root.foreground : root.dim)
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      textFormat: Text.PlainText
+    }
+
+    MouseArea {
+      id: styleArea
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: stylePill.clicked()
     }
   }
 

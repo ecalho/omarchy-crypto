@@ -8,8 +8,8 @@ lightweight price chart (1h, 4h, 1 day, 1 week, 1 month, or all history, your
 choice), and market stats. Clicking a coin in the popup pins it to the bar, and
 the choice is written to `shell.json`, so it survives a restart.
 
-Out of the box it follows Bitcoin. Name any coins you want in the `coins`
-setting and they appear, logo and all.
+Out of the box it follows Bitcoin, Ethereum and Kaspa, in that order. Name any
+coins you want in the `coins` setting and they appear, logo and all.
 
 Prices come from the free [CoinGecko](https://www.coingecko.com) API. No account
 and no API key.
@@ -113,12 +113,14 @@ packages, and touches nothing outside `~/.config/omarchy`.
 
 ## Settings
 
-Settings live inline on the widget's entry in `~/.config/omarchy/shell.json`,
-and are editable from Setup > Plugins.
+Settings live inline on the widget's entry in `~/.config/omarchy/shell.json`.
+The popup writes the ones you pick there — favorite coins, chart range and the
+**Bar layout** pills just above the chart. Anything else can be set from a
+terminal, e.g. `omarchy bar set ecalho.crypto barStyle compact`.
 
 | Key                  | Default                     | What it does |
 |----------------------|-----------------------------|--------------|
-| `coins`              | `bitcoin`                   | CoinGecko coin ids, comma-separated, in display order. Empty falls back to `bitcoin` |
+| `coins`              | `bitcoin,ethereum,kaspa`    | CoinGecko coin ids, comma-separated, in display order. Empty falls back to `bitcoin,ethereum,kaspa` |
 | `currency`           | `usd`                       | `usd`, `brl`, `eur`, `gbp`, `jpy`, `cad`, `aud`, `chf`, `cny`, `inr`, `sats`, `btc`, `eth` |
 | `primary`            | first coin                  | Which coin the bar shows. Written for you when you pin one |
 | `refreshIntervalSec` | `120`                       | Seconds between refreshes, minimum 30 |
@@ -195,8 +197,8 @@ It flips to the other side of the line near the edges so it never clips.
 
 ## Bar label
 
-The pill's length is set by the **Bar layout** setting (Setup → Plugins →
-Coin ticker). `full` shows the logo, ticker, price and percentage
+The pill's length is set by the **Bar layout** pills in the popup, just above
+the chart. `full` shows the logo, ticker, price and percentage
 (`₿ BTC $78,851 -1.07%`); `compact` drops the price for a shorter pill
 (`₿ BTC -1.07%`). The `showIcon` (logo), `showSymbol` (e.g. `KAS`) and
 `showChange` toggles still trim it further, so any combination works.
