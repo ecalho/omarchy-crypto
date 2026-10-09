@@ -480,16 +480,6 @@ function barLabel(coin, options) {
   return parts.join(" ")
 }
 
-function widestBarLabel(coins, options) {
-  var widest = ""
-  if (!coins) return widest
-  for (var i = 0; i < coins.length; ++i) {
-    var label = barLabel(coins[i], options)
-    if (label.length > widest.length) widest = label
-  }
-  return widest
-}
-
 function verticalBarLines(coin, options) {
   if (!coin) return []
   var pct = isFinite(options.changePct) ? options.changePct : coin.change24h

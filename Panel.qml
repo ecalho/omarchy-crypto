@@ -83,7 +83,7 @@ Panel {
   readonly property bool compactPrice: setting("compactPrice", false) === true
   readonly property bool colorizeChange: setting("colorizeChange", true) === true
   readonly property int rotateSeconds: {
-    var seconds = Math.floor(Number(setting("rotateSeconds", 10)))
+    var seconds = Math.floor(Number(setting("rotateSeconds", 0)))
     if (!isFinite(seconds) || seconds <= 0) return 0
     return Math.max(2, Math.min(3600, seconds))
   }
@@ -117,12 +117,6 @@ Panel {
   readonly property int displayDirection: displayCoin ? Model.changeDirection(root.barChangePct) : 0
 
   readonly property real pillIconSize: Math.round(Style.bar.iconFont * 1.15)
-
-  readonly property string widestBarText: rotateSeconds > 0
-    ? Model.widestBarLabel(coins, labelOptions)
-    : ""
-  readonly property real reservedPillWidth: pillMetrics.width
-    + (pillMetrics.width > 0 && showIcon ? pillIconSize + Style.space(6) : 0)
 
   function changeColor(pct, fallback) {
     var direction = Model.changeDirection(pct)
@@ -404,11 +398,11 @@ Panel {
     hasVisualContent: root.displayCoin !== null
     fixedWidth: root.vertical
       ? -1
-      : Math.round(Math.max(pillRow.implicitWidth, root.reservedPillWidth) + button.scaledHorizontalMargin * 2)
+      : Math.round(pillRow.implicitWidth + button.scaledHorizontalMargin * 2)
     fixedHeight: root.vertical
       ? Math.round(((root.showIcon ? 1 : 0) + root.barLines.length) * Style.bar.iconSlot)
       : -1
-    horizontalMargin: 8.75
+    horizontalMargin: 8.5
     verticalPadding: 8.75
     active: root.colorizeChange && root.displayDirection !== 0
     activeColor: root.displayDirection > 0 ? Color.accent : root.urgent
@@ -424,13 +418,6 @@ Panel {
 
     HoverHandler {
       id: pillHover
-    }
-
-    TextMetrics {
-      id: pillMetrics
-      font.family: button.fontFamily
-      font.pixelSize: button.fontSize
-      text: root.widestBarText
     }
 
     readonly property color labelColor: button.active && button.useActiveColor

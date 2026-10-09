@@ -124,7 +124,7 @@ terminal, e.g. `omarchy bar set ecalho.crypto barStyle compact`.
 | `currency`           | `usd`                       | `usd`, `brl`, `eur`, `gbp`, `jpy`, `cad`, `aud`, `chf`, `cny`, `inr`, `sats`, `btc`, `eth` |
 | `primary`            | first coin                  | Which coin the bar shows. Written for you when you pin one |
 | `refreshIntervalSec` | `120`                       | Seconds between refreshes, minimum 30 |
-| `rotateSeconds`      | `10`                        | Seconds each coin holds the bar. `0` pins the bar to one coin |
+| `rotateSeconds`      | `0`                         | Seconds each coin holds the bar before the next swaps in. `0` (default) keeps the selected coin pinned |
 | `showIcon`           | `true`                      | Coin logo before the price |
 | `showSymbol`         | `true`                      | `BTC`, `ETH`, … before the price |
 | `barStyle`           | `full`                      | `full` = logo + ticker + price + percentage. `compact` = logo + ticker + percentage only (shorter pill) |
@@ -248,23 +248,23 @@ Example:
 
 ## Rotation
 
-With more than one favorite, the bar walks through them every `rotateSeconds`
-and crossfades between coins. Set `rotateSeconds` to `0` to stop on the pinned
-coin instead.
+By default the bar stays on the coin you pinned (right-click the pill, or pick
+one in the popup). Set `rotateSeconds` to a number between 2 and 3600 and the
+bar walks through every favorite, crossfading from one to the next.
 
-Rotating and pinning are different things:
+Pinning and rotating are different things:
 
+- **Pinning** — clicking a coin in the popup, pressing `enter` on it, or
+  right-clicking the pill — writes `primary` to `shell.json`. Pinning is what
+  the bar shows by default.
 - **Rotating** moves which coin is on screen. Nothing is written down, so the
   bar comes back to the pinned coin after a restart.
-- **Pinning** — clicking a coin in the popup, pressing `enter` on it, or
-  right-clicking the pill — writes `primary` to `shell.json`. With rotation on,
-  the pinned coin is where the cycle starts.
 
 Rotation holds while the popup is open, since the popup already shows every
 coin, and while the pointer is on the pill, so a coin you are reading stays put.
 
-While it rotates, the pill reserves room for the widest label its favorites can
-produce, so the widgets beside it do not shift every few seconds.
+The pill sizes itself to the coin it is currently showing, so the widgets
+beside it always keep the same spacing.
 
 ## Rate limits
 

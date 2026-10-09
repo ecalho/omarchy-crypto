@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ecalho.crypto",
   "name": "Crypto",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "ecalho",
   "license": "MIT",
   "description": "Bitcoin and favorite crypto prices in the Omarchy bar — coin logos, 24h change, 7-day sparkline, market stats.",
@@ -24,7 +24,7 @@
       "currency": "usd",
       "primary": "",
       "refreshIntervalSec": 120,
-      "rotateSeconds": 10,
+      "rotateSeconds": 0,
       "chartRange": "1w",
       "showIcon": true,
       "showSymbol": true,
@@ -62,11 +62,11 @@
         "key": "rotateSeconds",
         "type": "integer",
         "label": "Rotate every (seconds)",
-        "description": "Walk the bar through every favorite on a timer. 0 keeps the pinned coin in place. Rotation holds while the popup is open or the pointer is on the pill.",
+        "description": "Seconds each favorite holds the bar before the next one swaps in. 0 keeps the selected coin pinned to the bar.",
         "min": 0,
         "max": 3600,
         "step": 1,
-        "defaultValue": 10
+        "defaultValue": 0
       },
       {
         "key": "showIcon",
