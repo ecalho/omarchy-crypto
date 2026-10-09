@@ -402,7 +402,7 @@ Panel {
     fixedHeight: root.vertical
       ? Math.round(((root.showIcon ? 1 : 0) + root.barLines.length) * Style.bar.iconSlot)
       : -1
-    horizontalMargin: 8.5
+    horizontalMargin: 4.5
     verticalPadding: 8.75
     active: root.colorizeChange && root.displayDirection !== 0
     activeColor: root.displayDirection > 0 ? Color.accent : root.urgent
